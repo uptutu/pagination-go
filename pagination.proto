@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+option go_package = "github.com/uptutu/pagination-go/pagination";
+
+package pagination;
+
+message PaginationRequest {
+  int64 page_num = 1;
+  int64 page_size = 2;
+  string order_by = 3;
+  bool is_descending = 4;
+  string search_key = 5;
+}
+
+message PaginationResponse {
+  int64 total = 1;
+  int64 page_num = 2;
+  int64 last_page = 3;
+  int64 page_size = 4;
+}
+
