@@ -4,6 +4,10 @@ import "reflect"
 
 type Option func(*Page) error
 
+var (
+	_requestStructSearchFields = []string{"Page", "Pagination", "PageRequest", "PaginationRequest"}
+)
+
 // Parse a struct which have defined Page fields.
 func Parse(req interface{}, options ...Option) (Page, error) {
 	q := Page{
@@ -19,9 +23,9 @@ func Parse(req interface{}, options ...Option) (Page, error) {
 		}
 	}
 
-	if !(v.FieldByName("PageNum").IsValid() && v.FieldByName("PageSize").IsValid()) {
-		keywords := []string{"Page", "Pagination", "PageRequest", "PaginationRequest"}
-		for _, word := range keywords {
+	if !((v.FieldByName("PageNum").IsValid() || v.FieldByName("Num").IsValid()) &&
+		(v.FieldByName("PageSize").IsValid() || v.FieldByName("Size").IsValid())) {
+		for _, word := range _requestStructSearchFields {
 			if v.FieldByName(word).IsValid() {
 				v = v.FieldByName(word)
 				for v.Type().Kind() == reflect.Ptr {
@@ -36,52 +40,37 @@ func Parse(req interface{}, options ...Option) (Page, error) {
 	for i := 0; i < v.NumField(); i++ {
 		if v.Field(i).CanInterface() {
 			switch v.Type().Field(i).Name {
-			case "PageNum":
-				if val, ok := v.Field(i).Interface().(int); ok {
-					q.Num = val
-					continue
-				}
-				if val, ok := v.Field(i).Interface().(int32); ok {
-					q.Num = int(val)
-					continue
-				}
-				if val, ok := v.Field(i).Interface().(int64); ok {
-					q.Num = int(val)
+			case "PageNum", "Num":
+				if v.Field(i).CanConvert(reflect.TypeOf(q.Num)) {
+					q.Num = v.Field(i).Convert(reflect.TypeOf(q.Num)).Interface().(int)
 					continue
 				}
 				return q, ErrInvalidPageNum
-			case "PageSize":
-				if val, ok := v.Field(i).Interface().(int); ok {
-					q.Size = val
-					continue
-				}
-				if val, ok := v.Field(i).Interface().(int32); ok {
-					q.Size = int(val)
-					continue
-				}
-				if val, ok := v.Field(i).Interface().(int64); ok {
-					q.Size = int(val)
+			case "PageSize", "Size":
+				if v.Field(i).CanConvert(reflect.TypeOf(q.Size)) {
+					q.Size = v.Field(i).Convert(reflect.TypeOf(q.Size)).Interface().(int)
 					continue
 				}
 				return q, ErrInvalidPageSize
-			case "OrderBy":
+			case "OrderBy", "Order":
 				if val, ok := v.Field(i).Interface().(string); ok {
 					q.OrderBy = val
-				} else {
-					return q, ErrInvalidOrderBy
+					continue
 				}
+				return q, ErrInvalidOrderBy
+
 			case "IsDescending":
 				if val, ok := v.Field(i).Interface().(bool); ok {
 					q.IsDescending = val
-				} else {
-					return q, ErrInvalidIsDescending
+					continue
 				}
+				return q, ErrInvalidIsDescending
 			case "SearchKey":
 				if val, ok := v.Field(i).Interface().(string); ok {
 					q.SearchKey = val
-				} else {
-					return q, ErrInvalidSearchKey
+					continue
 				}
+				return q, ErrInvalidSearchKey
 			}
 		}
 	}

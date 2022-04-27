@@ -20,6 +20,8 @@ var (
 	ErrTryToSetIntNumber      = errors.New("try to set int number to not int type field")
 )
 
+var _defaultResponseSearchingField = []string{"Page", "Pagination"}
+
 type Page struct {
 	Num          int
 	Size         int
@@ -57,10 +59,12 @@ func (p *Page) SetTotal(total int) {
 	p.Total = total
 }
 
-func (p Page) FillResponse(resp interface{}) error {
+func (p Page) FillResponse(resp interface{}, fields ...string) error {
 	// check response type and field
-	keywords := []string{"Page", "Pagination"}
-
+	keywords := _defaultResponseSearchingField
+	if len(fields) != 0 {
+		keywords = fields
+	}
 	v := reflect.ValueOf(resp)
 	for v.Type().Kind() != reflect.Struct {
 		switch v.Type().Kind() {
@@ -77,8 +81,8 @@ func (p Page) FillResponse(resp interface{}) error {
 
 	for {
 		if !(v.FieldByName("Total").IsValid() &&
-			v.FieldByName("PageNum").IsValid() &&
-			v.FieldByName("PageSize").IsValid()) {
+			(v.FieldByName("PageNum").IsValid() || v.FieldByName("Num").IsValid() || v.FieldByName("CurrentPage").IsValid() || v.FieldByName("CurrentPageNum").IsValid()) &&
+			v.FieldByName("PageSize").IsValid() || v.FieldByName("Size").IsValid()) {
 			for _, word := range keywords {
 				if v.FieldByName(word).IsValid() {
 					v = v.FieldByName(word)
@@ -105,7 +109,7 @@ func (p Page) FillResponse(resp interface{}) error {
 				if err := SetNumber(f, p.Total); err != nil {
 					return err
 				}
-			case "PageNum":
+			case "PageNum", "CurrentPage", "CurrentPageNum", "Num":
 				if err := SetNumber(f, p.Num); err != nil {
 					return err
 				}
@@ -127,7 +131,7 @@ func (p Page) FillResponse(resp interface{}) error {
 					return err
 				}
 
-			case "PageSize":
+			case "PageSize", "Size":
 				if p.Size == 0 {
 					if err := SetNumber(f, p.Total); err != nil {
 						return err

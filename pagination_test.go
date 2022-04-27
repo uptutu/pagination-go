@@ -26,6 +26,16 @@ type SearchDialogCasesResponse struct {
 	data string
 }
 
+type uintFieldData struct {
+	PageNum      uint
+	PageSize     uint
+	OrderBy      string
+	IsDescending bool
+	KeyWords     string
+	SearchKey    string
+	CustomField  string
+}
+
 var (
 	pbData = SearchDialogCasesRequest{
 		Page: &PaginationRequest{
@@ -45,6 +55,17 @@ var (
 		SearchKey:    "search",
 		CustomField:  "my data",
 	}
+
+	uintData = uintFieldData{
+		PageNum:      10,
+		PageSize:     50,
+		OrderBy:      "id",
+		IsDescending: true,
+		KeyWords:     "key",
+		SearchKey:    "search",
+		CustomField:  "my data",
+	}
+
 	targetPage = Page{
 		Num:          10,
 		Size:         50,
@@ -80,6 +101,16 @@ func TestParse(t *testing.T) {
 		{
 			name:     "test custom ptr",
 			data:     &customData,
+			excepted: targetPage,
+		},
+		{
+			name:     "test uint data",
+			data:     uintData,
+			excepted: targetPage,
+		},
+		{
+			name:     "test uint ptr",
+			data:     &uintData,
 			excepted: targetPage,
 		},
 		{
