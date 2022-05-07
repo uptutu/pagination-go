@@ -71,7 +71,7 @@ var (
 		Size:         50,
 		OrderBy:      "id",
 		IsDescending: true,
-		SearchKey:    "search",
+		Query:        "search",
 		defaultSize:  15,
 	}
 )

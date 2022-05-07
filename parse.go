@@ -34,7 +34,6 @@ func Parse(req interface{}, options ...Option) (Page, error) {
 				break
 			}
 		}
-
 	}
 
 	for i := 0; i < v.NumField(); i++ {
@@ -52,22 +51,22 @@ func Parse(req interface{}, options ...Option) (Page, error) {
 					continue
 				}
 				return q, ErrInvalidPageSize
-			case "OrderBy", "Order":
+			case "OrderBy":
 				if val, ok := v.Field(i).Interface().(string); ok {
 					q.OrderBy = val
 					continue
 				}
 				return q, ErrInvalidOrderBy
 
-			case "IsDescending":
+			case "IsDescending", "Descending":
 				if val, ok := v.Field(i).Interface().(bool); ok {
 					q.IsDescending = val
 					continue
 				}
 				return q, ErrInvalidIsDescending
-			case "SearchKey":
+			case "Query", "SearchKey":
 				if val, ok := v.Field(i).Interface().(string); ok {
-					q.SearchKey = val
+					q.Query = val
 					continue
 				}
 				return q, ErrInvalidSearchKey

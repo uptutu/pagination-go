@@ -9,7 +9,7 @@ message PaginationRequest {
   int64 page_size = 2;
   string order_by = 3;
   bool is_descending = 4;
-  string search_key = 5;
+  string query = 5;
 }
 
 message PaginationResponse {

@@ -16,8 +16,7 @@ var (
 	ErrInvalidResponse        = errors.New("invalid response")
 	ErrResponseFieldType      = errors.New("response filed type")
 	ErrResponseFieldUnsetable = errors.New("response field unsetable")
-	ErrTryToSetUintNumber     = errors.New("try to set uint number to not uint type field")
-	ErrTryToSetIntNumber      = errors.New("try to set int number to not int type field")
+	ErrTryToSetinvalidNumber  = errors.New("try to set invalid number to field")
 )
 
 var _defaultResponseSearchingField = []string{"Page", "Pagination"}
@@ -27,7 +26,7 @@ type Page struct {
 	Size         int
 	OrderBy      string
 	IsDescending bool
-	SearchKey    string
+	Query        string
 	Total        int
 	defaultSize  int
 }
@@ -69,7 +68,7 @@ func (p Page) FillResponse(resp interface{}, fields ...string) error {
 	for v.Type().Kind() != reflect.Struct {
 		switch v.Type().Kind() {
 		case reflect.Ptr:
-			if v.Elem().IsValid() {
+			if v.Elem().IsValid() && !v.IsNil() {
 				v = v.Elem()
 				break
 			}
@@ -79,113 +78,104 @@ func (p Page) FillResponse(resp interface{}, fields ...string) error {
 		}
 	}
 
+traverse:
 	for {
-		if !(v.FieldByName("Total").IsValid() &&
+		if v.FieldByName("Total").IsValid() &&
 			(v.FieldByName("PageNum").IsValid() || v.FieldByName("Num").IsValid() || v.FieldByName("CurrentPage").IsValid() || v.FieldByName("CurrentPageNum").IsValid()) &&
-			v.FieldByName("PageSize").IsValid() || v.FieldByName("Size").IsValid()) {
-			for _, word := range keywords {
-				if v.FieldByName(word).IsValid() {
-					v = v.FieldByName(word)
-					for v.Type().Kind() == reflect.Ptr {
-						if !v.Elem().IsValid() {
-							return ErrInvalidResponse
-						}
-						v = v.Elem()
-					}
-					break
-				}
-				return ErrInvalidResponse
-			}
-		} else {
+			v.FieldByName("PageSize").IsValid() || v.FieldByName("Size").IsValid() {
 			break
 		}
+
+		for _, word := range keywords {
+			if v.FieldByName(word).IsValid() {
+				v = v.FieldByName(word)
+				for v.Type().Kind() == reflect.Ptr {
+					if !v.Elem().IsValid() {
+						return ErrInvalidResponse
+					}
+					v = v.Elem()
+				}
+				goto traverse
+			}
+		}
+		return ErrInvalidResponse
 	}
 
 	for i := 0; i < v.NumField(); i++ {
-		if v.Field(i).CanInterface() {
-			f := v.Field(i)
-			switch v.Type().Field(i).Name {
-			case "Total":
+		if !v.Field(i).CanInterface() {
+			continue
+		}
+		f := v.Field(i)
+		switch v.Type().Field(i).Name {
+		case "Total":
+			if err := SetNumber(f, p.Total); err != nil {
+				return err
+			}
+		case "PageNum", "CurrentPage", "CurrentPageNum", "Num":
+			if err := SetNumber(f, p.Num); err != nil {
+				return err
+			}
+		case "LastPage":
+			if p.Size == 0 {
+				if err := SetNumber(f, 0); err != nil {
+					return err
+				}
+				continue
+			}
+			lastPage := p.Total / p.Size
+			if p.Total%p.Size == 0 {
+				if err := SetNumber(f, lastPage); err != nil {
+					return err
+				}
+				continue
+			}
+			if err := SetNumber(f, lastPage+1); err != nil {
+				return err
+			}
+
+		case "PageSize", "Size":
+			if p.Size == 0 {
 				if err := SetNumber(f, p.Total); err != nil {
 					return err
 				}
-			case "PageNum", "CurrentPage", "CurrentPageNum", "Num":
-				if err := SetNumber(f, p.Num); err != nil {
-					return err
-				}
-			case "LastPage":
-				if p.Size == 0 {
-					if err := SetNumber(f, 0); err != nil {
-						return err
-					}
-					continue
-				}
-				lastPage := p.Total / p.Size
-				if p.Total%p.Size == 0 {
-					if err := SetNumber(f, lastPage); err != nil {
-						return err
-					}
-					continue
-				}
-				if err := SetNumber(f, lastPage+1); err != nil {
-					return err
-				}
-
-			case "PageSize", "Size":
-				if p.Size == 0 {
-					if err := SetNumber(f, p.Total); err != nil {
-						return err
-					}
-					continue
-				}
-				if err := SetNumber(f, p.Size); err != nil {
-					return err
-				}
+				continue
+			}
+			if err := SetNumber(f, p.Size); err != nil {
+				return err
 			}
 		}
+
 	}
 	return nil
 }
 
-const (
-	flagUnknown = iota
-	flagInt
-	flagUint
-)
-
 func SetNumber(f reflect.Value, number interface{}) error {
-	flag := flagUnknown
-	nt := reflect.TypeOf(number)
-
-	if nt.Kind() == reflect.Int || nt.Kind() == reflect.Int8 ||
-		nt.Kind() == reflect.Int16 || nt.Kind() == reflect.Int32 ||
-		nt.Kind() == reflect.Int64 {
-		flag = flagInt
-	}
-
-	if nt.Kind() == reflect.Uint || nt.Kind() == reflect.Uint8 ||
-		nt.Kind() == reflect.Uint16 || nt.Kind() == reflect.Uint32 ||
-		nt.Kind() == reflect.Uint64 {
-		flag = flagUint
-	}
-
+	iv := reflect.ValueOf(number)
 	if !f.CanSet() {
 		return ErrResponseFieldUnsetable
 	}
-
-	switch flag {
-	case flagInt:
-		if !f.CanInt() {
-			return ErrTryToSetIntNumber
+	if f.CanInt() {
+		if iv.CanInt() {
+			f.SetInt(reflect.ValueOf(number).Int())
+			return nil
 		}
-		f.SetInt(reflect.ValueOf(number).Int())
-	case flagUint:
-		if !f.CanUint() {
-			return ErrTryToSetUintNumber
+		if iv.CanConvert(reflect.TypeOf(int(0))) {
+			f.SetInt(iv.Convert(reflect.TypeOf(int(0))).Int())
+			return nil
 		}
-		f.SetUint(reflect.ValueOf(number).Uint())
-	default:
-		return ErrResponseFieldType
+		return ErrTryToSetinvalidNumber
 	}
-	return nil
+	if f.CanUint() {
+		if iv.CanUint() {
+			f.SetUint(iv.Uint())
+			return nil
+		}
+		if iv.CanConvert(reflect.TypeOf(uint(0))) {
+			f.SetUint(iv.Convert(reflect.TypeOf(uint(0))).Uint())
+			return nil
+		}
+		return ErrTryToSetinvalidNumber
+	}
+
+	return ErrResponseFieldType
 }
